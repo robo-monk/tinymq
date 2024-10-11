@@ -1,8 +1,8 @@
-import { resolve } from "path";
-import EventEmitter from "events";
+import { resolve } from "node:path";
+import EventEmitter from "node:events";
 
-import { randomUUID } from "crypto";
-import assert from "assert";
+import { randomUUID } from "node:crypto";
+import assert from "node:assert";
 
 import {
   findAvailableThread,
@@ -168,10 +168,12 @@ export class TinyQ<
 
 export function taskFromFile<TaskSignature extends (...params: any[]) => any>(
   filename: string,
-  dirname: string,
+  url: string,
 ) {
-  filename = resolve(dirname, filename);
+  // filename = resolve(dirname, filename);
   // console.log("filename is", filename);
+  filename = new URL(filename, url).pathname;
+  // filename = new URL(filename, import.meta.url).pathname;
   return {
     filename,
     entrypoint: null as unknown as TaskSignature,

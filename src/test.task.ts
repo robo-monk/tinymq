@@ -15,10 +15,10 @@ export async function testTask(...inputs: string[]) {
 //   console.log("gc...");
 // }, 500);
 
-console.log(`[Inited] :: ${__filename}`);
+console.log(`[Inited] :: ${self.name}`);
 
 registerEntrypoint(testTask);
-onDestroy(async () => {
-  console.log("killing...");
-  // await new Promise((r) => setTimeout(r, 1));
-});
+// onDestroy(async () => {
+//   console.log("killing...");
+//   // await new Promise((r) => setTimeout(r, 1));
+// });

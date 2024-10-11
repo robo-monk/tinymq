@@ -1,4 +1,4 @@
-import assert from "assert";
+import assert from "node:assert";
 import { JobStatus, type WorkerJob } from "./lib.js";
 import type {
   MasterToWorkerEvent,
@@ -14,10 +14,12 @@ interface WorkerContext {
 const __worker: WorkerContext = {
   entrypoint: () => {
     throw new Error(
-      `${__filename} does not provide a valid entrypoint. Use 'registerEntrypoint' to register your worker's entrypoint`,
+      `${self.name} does not provide a valid entrypoint. Use 'registerEntrypoint' to register your worker's entrypoint`,
     );
   },
-  onDestroy: () => `Terminating ${__filename} worker`,
+  onDestroy: () => {
+    console.log(`Terminating ${self.name} worker. Skipping all active jobs.`);
+  },
   isProcessing: false,
 };
 
@@ -54,8 +56,12 @@ const handleMessage = async (event: MessageEvent) => {
     const message: MasterToWorkerEvent = event.data;
     switch (message.type) {
       case "close":
-        if (__worker.isProcessing) await __worker?.onDestroy?.call(this);
-        return sendMessage({ type: "closed" });
+        if (__worker.isProcessing) {
+          console.log("worker is still working");
+        }
+        await __worker?.onDestroy?.call(this);
+        sendMessage({ type: "closed" });
+        return process.exit();
       case "job":
         assert(!__worker.isProcessing, `worker is currently working on job`);
         __worker.isProcessing = true;

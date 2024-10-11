@@ -4,9 +4,9 @@ import type { TestTask } from "./src/test.task";
 const tq = new TinyQ()
   .registerWorkerTask(
     "test",
-    taskFromFile<TestTask>("./src/test.task", __dirname),
+    taskFromFile<TestTask>("./src/test.task", import.meta.url),
     {
-      workerCount: 1,
+      workerCount: 10,
     },
   )
   // .registerWorkerTask<TestTask>("test", "src/tinytq/test.task.ts", {
@@ -41,7 +41,7 @@ const tq = new TinyQ()
 
 // tq.registerWorkerJob("test", "a", 1);
 
-setInterval(async () => {
+const interval = setInterval(async () => {
   console.log(
     "queue len is: ",
     await tq.taskWorkerRegistry.get("test")?.queue.length(),
@@ -75,5 +75,6 @@ process.on("SIGINT", async () => {
     }),
   ]);
 
-  process.exit();
+  // process.exit();
+  clearInterval(interval);
 });

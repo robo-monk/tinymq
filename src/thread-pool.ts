@@ -1,6 +1,6 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import { WorkerJob } from "./lib";
-import assert from "assert";
+import assert from "node:assert";
 
 export type MasterToWorkerEvent =
   | { type: "job"; job: WorkerJob<any> }
@@ -52,7 +52,14 @@ export function newThreadPool(
   pool.threads = Array(count)
     .fill(0)
     .map(() => {
-      const worker = new Worker(filename);
+      console.log("filename", filename);
+      const url = new URL(filename, import.meta.url).href;
+      console.log("url is", url);
+      const worker = new Worker(url, {
+        name: "Slave",
+        type: "module",
+      });
+      worker.onerror = (ev) => console.error("error", ev);
 
       const thread: Thread = {
         _worker: worker,
@@ -71,6 +78,8 @@ export function newThreadPool(
             break;
           }
           case "closed": {
+            console.log("externally killing worker!");
+            // thread._worker.unref();
             thread._worker.terminate();
             thread.isOpen = false;
             pool.events.emit("thread:kill", thread);
