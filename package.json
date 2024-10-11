@@ -2,6 +2,9 @@
   "name": "tinytq",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "deno": "deno run --unstable-sloppy-imports --allow-read index.ts"
+  },
   "devDependencies": {
     "@types/bun": "^1.1.11"
   },

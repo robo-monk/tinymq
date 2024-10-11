@@ -1,9 +1,9 @@
 import assert from "node:assert";
-import { JobStatus, type WorkerJob } from "./lib.js";
+import { JobStatus, type WorkerJob } from "./tinyq";
 import type {
   MasterToWorkerEvent,
   WorkerToMasterEvent,
-} from "./thread-pool.js";
+} from "./tinyq-processor.js";
 
 interface WorkerContext {
   entrypoint: (...params: any) => any;
@@ -26,11 +26,11 @@ const __worker: WorkerContext = {
 export const onDestroy = (cb: typeof __worker.onDestroy) =>
   (__worker.onDestroy = cb);
 
-function sendMessage(message: WorkerToMasterEvent) {
+function sendMessage(message: WorkerToMasterEvent<any>) {
   self.postMessage(message);
 }
 
-const processJob = async (job: WorkerJob) => {
+const processJob = async (job: WorkerJob<any>) => {
   try {
     const start = performance.now();
     try {
@@ -46,7 +46,7 @@ const processJob = async (job: WorkerJob) => {
     console.error("Task processing failed: ", e);
   } finally {
     __worker.isProcessing = false; // Task completed, set flag to false
-    sendMessage({ type: "job", job }); // Send the result back
+    sendMessage({ type: "job:processed", job }); // Send the result back
   }
 };
 
@@ -62,7 +62,7 @@ const handleMessage = async (event: MessageEvent) => {
         await __worker?.onDestroy?.call(this);
         sendMessage({ type: "closed" });
         return process.exit();
-      case "job":
+      case "job:start":
         assert(!__worker.isProcessing, `worker is currently working on job`);
         __worker.isProcessing = true;
         const job = message.job;
