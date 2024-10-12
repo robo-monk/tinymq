@@ -26,8 +26,10 @@ const __worker: WorkerContext = {
 export const onDestroy = (cb: typeof __worker.onDestroy) =>
   (__worker.onDestroy = cb);
 
+// console.assert(process.send)
 function sendMessage(message: WorkerToMasterEvent<any>) {
-  self.postMessage(message);
+  // self.postMessage(message);
+  process.send!(message);
 }
 
 const processJob = async (job: WorkerJob<any>) => {
@@ -50,10 +52,12 @@ const processJob = async (job: WorkerJob<any>) => {
   }
 };
 
-const handleMessage = async (event: MessageEvent) => {
+// const handleMessage = async (event: MessageEvent) => {
+const handleMessage = async (message: MasterToWorkerEvent) => {
+  // console.log("get message", message);
   try {
-    assert(event.type == "message", "expected a message");
-    const message: MasterToWorkerEvent = event.data;
+    // assert(event.type == "message", "expected a message");
+    // const message: MasterToWorkerEvent = event.data;
     switch (message.type) {
       case "close":
         if (__worker.isProcessing) {
@@ -75,8 +79,25 @@ const handleMessage = async (event: MessageEvent) => {
 };
 
 // self.addEventListener("message", handleMessage);
-self.onmessage = handleMessage;
-console.log("inited");
+// self.onmessage = handleMessage;
+// console.log(`${Bun.env.workerName}] inited`);
+
+const consoleProxy = new Proxy(console, {
+  get(target: Console, property: keyof Console) {
+    if (typeof target[property] === "function") {
+      return (...args: any) => {
+        const prefix = `[${Bun.env.workerName}]`; // The prefix you want to add
+        // @ts-ignore
+        target[property].apply(target, [`${prefix}`, ...args]);
+      };
+    }
+    return target[property]; // If it's not a function, return it as-is
+  },
+});
+globalThis.console = consoleProxy;
+
+// console.log =
+
 // addEventListener("message", handleMessage);
 
 export function registerEntrypoint(callback: (...p: any) => any) {
@@ -85,3 +106,4 @@ export function registerEntrypoint(callback: (...p: any) => any) {
 }
 
 sendMessage({ type: "hello" });
+process.on("message", handleMessage);

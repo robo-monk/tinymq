@@ -32,8 +32,6 @@ export interface TinyDispatcher<T> {
   popJob(): Promise<T | undefined>;
   getPendingJobCount(): Promise<number>;
   events: EventEmitter<TinyDispatcherEvents<T>>;
-  // onNewJob(): Promise<void>;
-  // subscribe(channel: string, handler: (message: string) => void): Promise<void>;
 }
 
 export class InMemoryTinyDispatcher<T> implements TinyDispatcher<T> {
@@ -69,12 +67,12 @@ export class TinyQ<
     return this;
   }
 
-  protected workerUrl?: string;
+  protected workerUrl?: URL;
   useWorkerFile<TaskSignature extends (...params: any) => any>(
     filename: string,
     importMeta: ImportMeta,
   ): TinyQ<TaskSignature> {
-    this.workerUrl = new URL(filename, importMeta.url).href;
+    this.workerUrl = new URL(filename, importMeta.url);
     return this as unknown as TinyQ<TaskSignature>;
   }
 
@@ -93,7 +91,9 @@ export class TinyQ<
       metadata: {},
       executionTime: 0,
     };
-    await this.dispatcher.pushJob(job);
+    await this.dispatcher
+      .pushJob(job)
+      .catch((e) => console.error("error pushing job!", e));
   }
 
   static _getSettings(q: TinyQ) {

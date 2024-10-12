@@ -1,61 +1,52 @@
-// shared-tinyqueues.ts
-import { generateHeapSnapshot } from "bun";
-import { TinyQ } from "./src/tinyq";
-import { processTinyQs } from "./src/tinyq-processor";
-import type { TestTask } from "./test.task";
+import { testTq } from "./queues";
 
-export const testTq = new TinyQ("test")
-  .useWorkerFile<TestTask>("./test.task", import.meta)
-  .setConcurrency(2);
-
-testTq.dispatcher.events.on("job:complete", (job) => {
-  // console.log("job done", job.executionTime, job.output);
-});
-
-const pools = processTinyQs(testTq);
-
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-const i = setInterval(() => {
-  // generateHeapSnapshot().
-  // Bun.gc(true);
-  console.time("flood");
-  for (let i = 0; i < 200_000; i++) {
-    testTq.enqueueJob("hello", "hoo");
-  }
-  console.timeEnd("flood");
-  // console.log("memory usage is", process.memoryUsage());
-  // Bun.gc(true);
-  // console.log("after gc memory usage is", process.memoryUsage());
-}, 5_000);
-
-setInterval(() => {
-  const heapTotalInMB = process.memoryUsage().heapUsed / 1024 / 1024;
-  console.log(
-    `[main] memory usage from this process is: `,
-    heapTotalInMB.toFixed(2), // rounding to 2 decimal places
-    "MB",
-  );
-}, 1_000);
-
-process.on("SIGINT", async () => {
-  console.log("Received SIGINT");
-  console.log("Terminating workers");
-  const promises = pools.flatMap((pool) => {
-    return new Promise<void>((resolve) => {
-      pool.threads.forEach((thread) => {
-        thread.sendMessage({ type: "close" });
-      });
-      pool.events.once("pool:kill", resolve);
-    });
+testTq.dispatcher.events
+  .on("job:push", (job) => {
+    console.log("job pushed", job);
+  })
+  .on("job:complete", (job) => {
+    console.log("job done", job.executionTime, job.output);
   });
-  await Promise.all(promises);
-  console.log("kill all");
-  clearInterval(i);
-});
+
+// testTq.enqueueJob("hello", "hoo");
+// testTq.enqueueJob("hello", "hoo");
+// testTq.enqueueJob("hello", "hoo");
+// testTq.enqueueJob("hello", "hoo");
+// testTq.enqueueJob("hello", "hoo");
+
+// testTq.enqueueJob("hello", "hoo");
+
+// const i = setInterval(() => {
+//   // generateHeapSnapshot().
+//   // Bun.gc(true);
+//   console.time("flood");
+//   for (let i = 0; i < 10_000; i++) {
+//     testTq.enqueueJob("hello", "hoo");
+//   }
+//   console.timeEnd("flood");
+// }, 5_000);
+
+for (let i = 0; i < 10_000; i++) {
+  testTq.enqueueJob("hello", "hoo");
+}
+
+// console.log("memory usage is", process.memoryUsage());
+// Bun.gc(true);
+// console.log("after gc memory usage is", process.memoryUsage());
+// }, 5_000);
+
+// setInterval(() => {
+//   const heapTotalInMB = process.memoryUsage().heapUsed / 1024 / 1024;
+//   console.log(
+//     `[main] memory usage from this process is: `,
+//     heapTotalInMB.toFixed(2), // rounding to 2 decimal places
+//     "MB",
+//   );
+// }, 1_000);
+
+// setTimeout(() => {
+
+// }, 10_000);
 
 // .concurrency(4)
 // .on("completed", (job) => console.log("job done"))
