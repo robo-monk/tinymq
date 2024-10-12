@@ -1,12 +1,12 @@
 import { testTq } from "./queues";
 
-testTq.dispatcher.events
-  .on("job:push", (job) => {
-    console.log("job pushed", job);
-  })
-  .on("job:complete", (job) => {
-    console.log("job done", job.executionTime, job.output);
-  });
+// testTq.dispatcher.events
+//   .on("job:push", (job) => {
+//     console.log("job pushed", job);
+//   })
+//   .on("job:complete", (job) => {
+//     console.log("job done", job.executionTime, job.output);
+//   });
 
 // testTq.enqueueJob("hello", "hoo");
 // testTq.enqueueJob("hello", "hoo");

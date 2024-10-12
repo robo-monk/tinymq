@@ -29,7 +29,6 @@ class JobThread<T extends WorkerJob<any>> {
   private subprocess: Subprocess;
 
   constructor(
-    // public _subprocess: Subprocess,
     cmd: string[],
     spawnOptions: SpawnOptions.OptionsObject,
     private poolEvents: ThreadPool<T>["events"],
@@ -37,19 +36,12 @@ class JobThread<T extends WorkerJob<any>> {
     this.subprocess = Bun.spawn(cmd, {
       ...spawnOptions,
       ipc: this.handleWorkerMessage.bind(this),
-      // ipck
+      // ipc
       stdout: "inherit",
     });
-
-    // this._subprocess.onmessage = (event) => {
-    //   assert(event.type, "message");
-    //   this.handleWorkerMessage(event.data);
-    // };
   }
 
   async handleWorkerMessage(message: WorkerToMasterEvent<T>) {
-    // console.log("get message", message);
-    // console.log("message thread", message);
     switch (message.type) {
       case "hello": {
         this.isOpen = true;
@@ -64,7 +56,6 @@ class JobThread<T extends WorkerJob<any>> {
         break;
       }
       case "closed": {
-        // this.subprocess.terminate();
         this.subprocess.kill();
         await this.subprocess.exited;
         this.isOpen = false;
@@ -75,7 +66,6 @@ class JobThread<T extends WorkerJob<any>> {
   }
 
   sendMessage(message: MasterToWorkerEvent) {
-    // console.log("send message", message);
     this.subprocess.send(message);
   }
 
@@ -140,13 +130,7 @@ export const processTinyQs = <K extends (...p: any) => any>(
       }
     });
 
-    let totalNextJobsCount = 0;
     const processNextJob = async () => {
-      totalNextJobsCount += 1;
-      // console.log({ totalNextJobsCount });
-      // const hasPendingJobs = (await dispatcher.getPendingJobCount()) > 0;
-      // if (!hasPendingJobs) return;
-
       const thread = findAvailableThread(threadPool);
       if (!thread) return;
       thread.lock(); // preserve atomicity
@@ -166,6 +150,7 @@ export const processTinyQs = <K extends (...p: any) => any>(
     threadPool.events.on("job:complete", (job) => {
       dispatcher.events.emit("job:complete", job);
     });
+
     return threadPool;
   });
 

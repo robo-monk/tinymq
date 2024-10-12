@@ -1,5 +1,6 @@
-import EventEmitter from "node:events";
 import { randomUUID } from "node:crypto";
+import { RedisTinyDispatcher, TinyDispatcher } from "./tinyq-dispatcher";
+import Redis from "ioredis";
 
 export enum JobStatus {
   PENDING,
@@ -10,7 +11,6 @@ export enum JobStatus {
 
 export interface WorkerJob<JobSignature extends (...params: any) => any> {
   id: string;
-  jobName: string;
   status: JobStatus;
   input: Parameters<JobSignature>;
   output?: ReturnType<JobSignature>;
@@ -19,52 +19,19 @@ export interface WorkerJob<JobSignature extends (...params: any) => any> {
   executionTime: number;
 }
 
-export interface TinyDispatcherEvents<T> {
-  "job:push": [job: T];
-  "job:pop": [job: T];
-
-  "job:complete": [job: T];
-  "job:start": [job: T];
-}
-
-export interface TinyDispatcher<T> {
-  pushJob(item: T): Promise<void>;
-  popJob(): Promise<T | undefined>;
-  getPendingJobCount(): Promise<number>;
-  events: EventEmitter<TinyDispatcherEvents<T>>;
-}
-
-export class InMemoryTinyDispatcher<T> implements TinyDispatcher<T> {
-  private queue: T[] = [];
-  events = new EventEmitter<TinyDispatcherEvents<T>>();
-
-  async pushJob(item: T): Promise<void> {
-    this.queue.push(item);
-    this.events.emit("job:push", item);
-  }
-
-  async popJob(): Promise<T | undefined> {
-    const item = this.queue.shift();
-    if (item) this.events.emit("job:pop", item);
-    return item;
-  }
-
-  async getPendingJobCount(): Promise<number> {
-    return this.queue.length;
-  }
-}
-
 export class TinyQ<
   JobSignature extends (...params: any) => any = (...params: unknown[]) => any,
 > {
-  constructor(private jobName: string) {}
+  private dispatcher: TinyDispatcher<WorkerJob<JobSignature>>;
 
-  protected dispatcher: TinyDispatcher<WorkerJob<JobSignature>> =
-    new InMemoryTinyDispatcher<WorkerJob<JobSignature>>();
-
-  useDispatcher(dispatcher: TinyDispatcher<WorkerJob<JobSignature>>) {
-    this.dispatcher = dispatcher;
-    return this;
+  constructor(
+    private jobName: string,
+    redis: Redis,
+  ) {
+    this.dispatcher = new RedisTinyDispatcher<WorkerJob<JobSignature>>(
+      redis,
+      jobName,
+    );
   }
 
   protected workerUrl?: URL;
@@ -84,7 +51,6 @@ export class TinyQ<
 
   async enqueueJob(...params: Parameters<JobSignature>) {
     const job: WorkerJob<JobSignature> = {
-      jobName: this.jobName,
       id: randomUUID(),
       status: JobStatus.PENDING,
       input: params,
