@@ -1,31 +1,6 @@
 import { testTq } from "./queues";
 
-// testTq.dispatcher.events
-//   .on("job:push", (job) => {
-//     console.log("job pushed", job);
-//   })
-//   .on("job:complete", (job) => {
-//     console.log("job done", job.executionTime, job.output);
-//   });
-
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-// testTq.enqueueJob("hello", "hoo");
-
-// testTq.enqueueJob("hello", "hoo");
-
-// const i = setInterval(() => {
-//   // generateHeapSnapshot().
-//   // Bun.gc(true);
-//   console.time("flood");
-//   for (let i = 0; i < 10_000; i++) {
-//     testTq.enqueueJob("hello", "hoo");
-//   }
-//   console.timeEnd("flood");
-// }, 5_000);
-
+console.log("hello?");
 for (let i = 0; i < 10_000; i++) {
   testTq.enqueueJob("hello", "hoo");
 }

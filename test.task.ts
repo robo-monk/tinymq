@@ -3,15 +3,20 @@ import { onDestroy, registerEntrypoint } from "./src/worker";
 export type TestTask = typeof testTask;
 
 export async function testTask(...inputs: string[]) {
-  console.log("test task", inputs);
+  // console.log("test task", inputs);
   let bs = "";
 
-  for (let i = 0; i < Math.random() * 10_000; i++) {
-    bs += randomUUID();
-  }
+  // for (let i = 0; i < 10_000_000; i++) {
+  //   bs += randomUUID();
+  // }
 
   // return 0;
-  return bs.slice(-5, -1);
+  // return bs.slice(-5, -1);
+
+  await new Promise((r) => {
+    setTimeout(r, 5_000);
+  });
+  return Math.random();
 }
 
 // setInterval(() => {
@@ -27,6 +32,6 @@ export async function testTask(...inputs: string[]) {
 
 registerEntrypoint(testTask);
 onDestroy(async () => {
-  console.log("killing...");
+  console.log(`killing...`);
   // clean up code
 });

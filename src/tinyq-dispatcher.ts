@@ -37,7 +37,6 @@ export class RedisTinyDispatcher<T> implements TinyDispatcher<T> {
     );
 
     // Handle incoming messages and re-emit them via EventEmitter
-    // this.subscriber.on
     this.subscriber.on("messageBuffer", (channel, buffer) => {
       const item = unpack(buffer) as T;
       this.events.emit(channel, item);
@@ -51,12 +50,10 @@ export class RedisTinyDispatcher<T> implements TinyDispatcher<T> {
   }
 
   async popJob(): Promise<T | undefined> {
-    console.log("!pushjob");
     const buffer = await this.redis.rpopBuffer(this.queueKey);
     if (!buffer) return undefined;
-    console.log("!pushjob");
     const item = unpack(buffer);
-    console.log("??pushjob");
+
     return item;
   }
 

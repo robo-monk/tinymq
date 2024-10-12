@@ -55,7 +55,7 @@ export class TinyQ<
       status: JobStatus.PENDING,
       input: params,
       metadata: {},
-      executionTime: 0,
+      executionTime: -1,
     };
     await this.dispatcher
       .pushJob(job)

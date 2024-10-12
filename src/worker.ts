@@ -1,3 +1,4 @@
+import EventEmitter from "node:events";
 import assert from "node:assert";
 import { JobStatus, type WorkerJob } from "./tinyq";
 import type {
@@ -54,18 +55,11 @@ const processJob = async (job: WorkerJob<any>) => {
 
 // const handleMessage = async (event: MessageEvent) => {
 const handleMessage = async (message: MasterToWorkerEvent) => {
-  // console.log("get message", message);
+  // console.log("got message", message);
   try {
     // assert(event.type == "message", "expected a message");
     // const message: MasterToWorkerEvent = event.data;
     switch (message.type) {
-      case "close":
-        if (__worker.isProcessing) {
-          console.log("worker is still working");
-        }
-        await __worker?.onDestroy?.call(this);
-        sendMessage({ type: "closed" });
-        return process.exit();
       case "job:start":
         assert(!__worker.isProcessing, `worker is currently working on job`);
         __worker.isProcessing = true;
@@ -74,7 +68,7 @@ const handleMessage = async (message: MasterToWorkerEvent) => {
         break;
     }
   } catch (e) {
-    console.error("Worker error!", e);
+    console.error("ERROR", e);
   }
 };
 
@@ -96,10 +90,6 @@ const consoleProxy = new Proxy(console, {
 });
 globalThis.console = consoleProxy;
 
-// console.log =
-
-// addEventListener("message", handleMessage);
-
 export function registerEntrypoint(callback: (...p: any) => any) {
   __worker.entrypoint = callback;
   return callback;
@@ -107,3 +97,38 @@ export function registerEntrypoint(callback: (...p: any) => any) {
 
 sendMessage({ type: "hello" });
 process.on("message", handleMessage);
+
+let isCleaningUp = false;
+const cleanup = async () => {
+  if (isCleaningUp) return;
+  isCleaningUp = true;
+
+  if (__worker.isProcessing) {
+    console.log("Worker is still working");
+    await new Promise<void>((resolve) => {
+      let timeout = 250;
+      const check = () => {
+        if (!__worker.isProcessing) {
+          resolve();
+        } else {
+          console.log(
+            `Worker is still working. Checking back in ${timeout / 1000}s`,
+          );
+          setTimeout(check, (timeout *= 2));
+        }
+      };
+
+      check();
+    });
+  }
+  console.log("Recieved command to terminate");
+  await __worker?.onDestroy?.call(this);
+  console.log("ok, all clean");
+  process.exit();
+};
+
+process.on("SIGINT", cleanup);
+process.on("SIGTERM", cleanup);
+process.on("SIGHUP", cleanup);
+
+console.log("Ready to work");

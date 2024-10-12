@@ -13,11 +13,11 @@ export const testTq = new TinyQ("test", new Redis())
 
 testTq.dispatcher.events
   .on("job:push", (job) => {
-    console.log("queue : job pushed", job);
+    console.log("queue : job pushed");
   })
   .on("job:complete", (job) => {
     redis.lpush("jobs-processed", pack(job));
-    // redis.lpush("jobs-processed-json", JSON.stringify(job));
+    console.log("job done", job.executionTime);
   });
 
 console.log("queue-ts");

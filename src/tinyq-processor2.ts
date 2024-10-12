@@ -56,9 +56,12 @@ class JobThread<T extends WorkerJob<any>> {
         break;
       }
       case "closed": {
-        this.subprocess.kill();
-        await this.subprocess.exited;
         this.isOpen = false;
+        console.log("worker is done");
+        this.subprocess.kill();
+        console.log("killing and awaiting exit");
+        await this.subprocess.exited;
+        console.log("exited");
         this.poolEvents.emit("thread:kill", this);
         break;
       }
@@ -91,6 +94,12 @@ class JobThread<T extends WorkerJob<any>> {
       type: "job:start",
       job,
     });
+  }
+
+  async kill() {
+    this.isOpen = false;
+    this.subprocess.kill();
+    return await this.subprocess.exited;
   }
 }
 
@@ -152,6 +161,23 @@ export const processTinyQs = <K extends (...p: any) => any>(
     });
 
     return threadPool;
+  });
+
+  process.on("SIGINT", async () => {
+    console.log("Received SIGINT");
+    console.log("Terminating workers");
+    const promises = pools.flatMap((pool) => {
+      // return new Promise<void>((resolve) => {
+      const kills = pool.threads.map((thread) => {
+        return thread.kill();
+      });
+      return kills;
+      // });
+    });
+    console.log("Waiting for all workers to close.");
+    await Promise.all(promises);
+    console.log("Exiting...");
+    process.exit();
   });
 
   return pools;

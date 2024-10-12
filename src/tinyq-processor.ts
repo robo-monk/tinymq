@@ -116,11 +116,11 @@ export const processTinyQs = <K extends (...p: any) => any>(
         return new JobThread(worker, threadPool.events);
       });
 
-    threadPool.events.on("thread:kill", (thread) => {
-      if (threadPool.threads.every((th) => !th.isOpen)) {
-        threadPool.events.emit("pool:kill");
-      }
-    });
+    // threadPool.events.on("thread:kill", (thread) => {
+    //   if (threadPool.threads.every((th) => !th.isOpen)) {
+    //     threadPool.events.emit("pool:kill");
+    //   }
+    // });
 
     let totalNextJobsCount = 0;
     const processNextJob = async () => {
