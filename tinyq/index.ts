@@ -58,9 +58,11 @@ export class TinyQ<
       executionTime: -1,
     };
 
-    await this.dispatcher
-      .pushJob(job)
-      .catch((e) => console.error("error pushing job!", e));
+    try {
+      await this.dispatcher.rpush(job);
+    } catch (e) {
+      console.error("eerror foudn here", e);
+    }
   }
 
   static _getSettings(q: TinyQ) {

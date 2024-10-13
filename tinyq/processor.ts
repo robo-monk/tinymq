@@ -34,6 +34,7 @@ class JobThread<T extends WorkerJob<any>> {
       // ipc
       stdout: "inherit",
     });
+    // this.subprocess.killed
   }
 
   async handleWorkerMessage(message: WorkerToMasterEvent<T>) {
@@ -55,6 +56,12 @@ class JobThread<T extends WorkerJob<any>> {
 
   sendMessage(message: MasterToWorkerEvent) {
     this.subprocess.send(message);
+  }
+
+  isAvailable() {
+    return (
+      !this.locked && this.isOpen && !this.isBusy && !this.subprocess.killed
+    );
   }
 
   private locked = false;
@@ -123,12 +130,10 @@ export const processTinyQs = <K extends (...p: any) => any>(
       if (!thread) return;
       thread.lock(); // preserve atomicity
 
-      const nextJob = await dispatcher.popJob();
-      thread.unlock();
-      if (!nextJob) {
-        return;
-      }
+      const nextJob = await dispatcher.lpop();
+      if (!nextJob) return thread.unlock();
 
+      thread.unlock();
       thread.startJob(nextJob);
     };
 

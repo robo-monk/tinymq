@@ -10,8 +10,9 @@ interface TinyDispatcherEvents<T> {
 }
 
 export interface TinyDispatcher<T> {
-  pushJob(item: T): Promise<void>;
-  popJob(): Promise<T | undefined>;
+  rpush(item: T): Promise<void>;
+  lpush(item: T): Promise<void>;
+  lpop(): Promise<T | undefined>;
   getPendingJobCount(): Promise<number>;
   events: EventEmitter<TinyDispatcherEvents<T>>;
   publish(event: string, arg: any): Promise<void>;
@@ -24,35 +25,47 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
   private subscriber: Redis;
   public events = new EventEmitter<TinyDispatcherEvents<T>>();
 
-  private queueKey: string;
-
-  constructor(redis: Redis, queueKey: string) {
+  constructor(
+    redis: Redis,
+    private queueKey: string,
+  ) {
     this.redis = redis;
     this.subscriber = redis.duplicate();
-    this.queueKey = queueKey;
 
     // Subscribe to Redis channels for job events
-    this.subscriber.subscribe("job:push", "job:complete", "job:start");
+    this.subscriber.subscribe(
+      `${queueKey}:job:push`,
+      `${queueKey}:job:complete`,
+      `${queueKey}:job:start`,
+    );
 
     this.subscriber.on("messageBuffer", (channel, buffer) => {
       const item = unpack(buffer) as T;
-      this.events.emit(channel, item);
+
+      const event = channel.toString().slice(`${queueKey}:`.length);
+      this.events.emit(event, item);
     });
   }
 
   async publish(event: string, arg: any) {
     const serializedItem = pack(arg);
-    await this.redis.publish(event, serializedItem);
+    await this.redis.publish(`${this.queueKey}:${event}`, serializedItem);
   }
 
-  async pushJob(item: T): Promise<void> {
+  async rpush(item: T): Promise<void> {
+    const serializedItem = pack(item);
+    await this.redis.rpush(this.queueKey, serializedItem);
+    await this.redis.publish(`${this.queueKey}:job:push`, serializedItem);
+  }
+
+  async lpush(item: T): Promise<void> {
     const serializedItem = pack(item);
     await this.redis.lpush(this.queueKey, serializedItem);
-    await this.redis.publish("job:push", serializedItem);
+    // console.debug("lpush");
   }
 
-  async popJob(): Promise<T | undefined> {
-    const buffer = await this.redis.rpopBuffer(this.queueKey);
+  async lpop(): Promise<T | undefined> {
+    const buffer = await this.redis.lpopBuffer(this.queueKey);
     if (!buffer) return undefined;
     const item = unpack(buffer);
 

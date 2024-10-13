@@ -1,4 +1,7 @@
 import { testTq } from "./queues";
-import { processTinyQs } from "./src/tinyq-processor";
+import { processTinyQs } from "./tinyq/processor";
 
-processTinyQs(testTq);
+// testTq.dispatcher.events.on("job:complete", (job) => {
+//   console.log("job complete", job.executionTime);
+// });
+processTinyQs(testTq.setConcurrency(2));

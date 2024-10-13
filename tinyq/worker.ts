@@ -31,7 +31,7 @@ const processJob = async (job: WorkerJob<any>) => {
   try {
     const start = performance.now();
     try {
-      job.output = await __worker.entrypoint(job.input); // Run the entrypoint function
+      job.output = await __worker.entrypoint(...job.input); // Run the entrypoint function
       job.status = JobStatus.COMPLETED;
     } catch (e: any) {
       console.error(`Job ${job.id} errored`, e);
@@ -91,27 +91,38 @@ const cleanup = async () => {
   if (isCleaningUp) return;
   isCleaningUp = true;
 
+  const maxWaitTime = parseInt(process.env.maxWaitTime || "60000"); // Maximum wait time in milliseconds (e.g., 30 seconds)
+  const startTime = Date.now();
+
+  console.log("I received a command to terminate");
   if (__worker.isProcessing) {
-    console.log("Worker is still working");
+    console.log("I'm still processing a job");
+
     await new Promise<void>((resolve) => {
-      let timeout = 250;
       const check = () => {
+        const elapsedTime = Date.now() - startTime;
         if (!__worker.isProcessing) {
           resolve();
-        } else {
-          console.log(
-            `Worker is still working. Checking back in ${timeout / 1000}s`,
+        } else if (elapsedTime >= maxWaitTime) {
+          console.warn(
+            `I've been processing for more than ${
+              maxWaitTime / 1000
+            } seconds. I'm forcefully terminating myself. Bye :(`,
           );
-          setTimeout(check, (timeout *= 2));
+          resolve();
+        } else {
+          console.log("I'm still working. Checking again in 1 second.");
+          setTimeout(check, 1000);
         }
       };
 
       check();
     });
   }
-  console.log("Recieved command to terminate");
+
+  console.log("Calling onDestroy");
   await __worker?.onDestroy?.call(this);
-  console.log("ok, all clean");
+  console.log("Cleaned up");
   process.exit();
 };
 

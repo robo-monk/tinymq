@@ -1,3 +1,5 @@
+
+
 // File: processor.ts
 
 import { TinyQ, type WorkerJob } from "./index";
@@ -57,6 +59,10 @@ class JobThread<T extends WorkerJob<any>> {
 
   sendMessage(message: MasterToWorkerEvent) {
     this.subprocess.send(message);
+  }
+
+  isAvailable() {
+    return !this.locked && this.isOpen && !this.isBusy;
   }
 
   private locked = false;
@@ -125,12 +131,10 @@ export const processTinyQs = <K extends (...p: any) => any>(
       if (!thread) return;
       thread.lock(); // preserve atomicity
 
-      const nextJob = await dispatcher.popJob();
-      thread.unlock();
-      if (!nextJob) {
-        return;
-      }
+      const nextJob = await dispatcher.lpop();
+      if (!nextJob) return thread.unlock();
 
+      thread.unlock();
       thread.startJob(nextJob);
     };
 
@@ -158,6 +162,7 @@ export const processTinyQs = <K extends (...p: any) => any>(
 
   return pools;
 };
+
 
 // File: index.ts
 
@@ -222,7 +227,7 @@ export class TinyQ<
     };
 
     await this.dispatcher
-      .pushJob(job)
+      .rpush(job)
       .catch((e) => console.error("error pushing job!", e));
   }
 
@@ -235,6 +240,7 @@ export class TinyQ<
     };
   }
 }
+
 
 // File: worker.ts
 
@@ -271,7 +277,7 @@ const processJob = async (job: WorkerJob<any>) => {
   try {
     const start = performance.now();
     try {
-      job.output = await __worker.entrypoint(job.input); // Run the entrypoint function
+      job.output = await __worker.entrypoint(...job.input); // Run the entrypoint function
       job.status = JobStatus.COMPLETED;
     } catch (e: any) {
       console.error(`Job ${job.id} errored`, e);
@@ -331,27 +337,38 @@ const cleanup = async () => {
   if (isCleaningUp) return;
   isCleaningUp = true;
 
+  const maxWaitTime = parseInt(process.env.maxWaitTime || "60000"); // Maximum wait time in milliseconds (e.g., 30 seconds)
+  const startTime = Date.now();
+
+  console.log("I received a command to terminate");
   if (__worker.isProcessing) {
-    console.log("Worker is still working");
+    console.log("I'm still processing a job");
+
     await new Promise<void>((resolve) => {
-      let timeout = 250;
       const check = () => {
+        const elapsedTime = Date.now() - startTime;
         if (!__worker.isProcessing) {
           resolve();
-        } else {
-          console.log(
-            `Worker is still working. Checking back in ${timeout / 1000}s`,
+        } else if (elapsedTime >= maxWaitTime) {
+          console.warn(
+            `I've been processing for more than ${
+              maxWaitTime / 1000
+            } seconds. I'm forcefully terminating myself. Bye :(`,
           );
-          setTimeout(check, (timeout *= 2));
+          resolve();
+        } else {
+          console.log("I'm still working. Checking again in 1 second.");
+          setTimeout(check, 1000);
         }
       };
 
       check();
     });
   }
-  console.log("Recieved command to terminate");
+
+  console.log("Calling onDestroy");
   await __worker?.onDestroy?.call(this);
-  console.log("ok, all clean");
+  console.log("Cleaned up");
   process.exit();
 };
 
@@ -360,6 +377,7 @@ process.on("SIGTERM", cleanup);
 process.on("SIGHUP", cleanup);
 
 console.log("Ready to work");
+
 
 // File: dispatcher.ts
 
@@ -375,8 +393,9 @@ interface TinyDispatcherEvents<T> {
 }
 
 export interface TinyDispatcher<T> {
-  pushJob(item: T): Promise<void>;
-  popJob(): Promise<T | undefined>;
+  rpush(item: T): Promise<void>;
+  lpush(item: T): Promise<void>;
+  lpop(): Promise<T | undefined>;
   getPendingJobCount(): Promise<number>;
   events: EventEmitter<TinyDispatcherEvents<T>>;
   publish(event: string, arg: any): Promise<void>;
@@ -410,14 +429,20 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
     await this.redis.publish(event, serializedItem);
   }
 
-  async pushJob(item: T): Promise<void> {
+  async rpush(item: T): Promise<void> {
     const serializedItem = pack(item);
-    await this.redis.lpush(this.queueKey, serializedItem);
+    await this.redis.rpush(this.queueKey, serializedItem);
     await this.redis.publish("job:push", serializedItem);
   }
 
-  async popJob(): Promise<T | undefined> {
-    const buffer = await this.redis.rpopBuffer(this.queueKey);
+  async lpush(item: T): Promise<void> {
+    const serializedItem = pack(item);
+    await this.redis.lpush(this.queueKey, serializedItem);
+    // console.debug("lpush");
+  }
+
+  async lpop(): Promise<T | undefined> {
+    const buffer = await this.redis.lpopBuffer(this.queueKey);
     if (!buffer) return undefined;
     const item = unpack(buffer);
 
