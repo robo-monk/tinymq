@@ -30,7 +30,7 @@ async function mergeFilesInDirectory(
 }
 
 // Example usage
-const directoryPath = "./tinyq"; // Path to the directory containing the files
-const outputFile = "./merged-output.ts"; // Output file for the merged content
+const directoryPath = "./test"; // Path to the directory containing the files
+const outputFile = "./merged-test-suite.ts"; // Output file for the merged content
 
 mergeFilesInDirectory(directoryPath, outputFile);

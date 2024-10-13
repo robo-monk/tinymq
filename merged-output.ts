@@ -36,8 +36,9 @@ class JobThread<T extends WorkerJob<any>> {
       ...spawnOptions,
       ipc: this.handleWorkerMessage.bind(this),
       // ipc
-      stdout: "inherit",
+      // stdout: "inherit",
     });
+    // this.subprocess.killed
   }
 
   async handleWorkerMessage(message: WorkerToMasterEvent<T>) {
@@ -62,7 +63,9 @@ class JobThread<T extends WorkerJob<any>> {
   }
 
   isAvailable() {
-    return !this.locked && this.isOpen && !this.isBusy;
+    return (
+      !this.locked && this.isOpen && !this.isBusy && !this.subprocess.killed
+    );
   }
 
   private locked = false;
@@ -100,8 +103,8 @@ export function findAvailableThread(pool: ThreadPool<any>) {
   return pool.threads.find((t) => !t.isBusy && t.isOpen && !t.isLocked);
 }
 
-export const processTinyQs = <K extends (...p: any) => any>(
-  ...qs: TinyQ<K>[]
+export const processTinyQs = <K extends (...params: any) => any>(
+  ...qs: TinyQ<any>[]
 ) => {
   const pools = qs.map((q) => {
     const { jobName, concurrency, dispatcher, workerUrl } =
@@ -181,7 +184,7 @@ export interface WorkerJob<JobSignature extends (...params: any) => any> {
   id: string;
   status: JobStatus;
   input: Parameters<JobSignature>;
-  output?: ReturnType<JobSignature>;
+  output?: Awaited<ReturnType<JobSignature>>;
   errors?: string[];
   metadata: Record<string, string>;
   executionTime: number;
@@ -226,9 +229,11 @@ export class TinyQ<
       executionTime: -1,
     };
 
-    await this.dispatcher
-      .rpush(job)
-      .catch((e) => console.error("error pushing job!", e));
+    try {
+      await this.dispatcher.rpush(job);
+    } catch (e) {
+      console.error("eerror foudn here", e);
+    }
   }
 
   static _getSettings(q: TinyQ) {
@@ -408,48 +413,78 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
   private subscriber: Redis;
   public events = new EventEmitter<TinyDispatcherEvents<T>>();
 
-  private queueKey: string;
-
-  constructor(redis: Redis, queueKey: string) {
+  constructor(
+    redis: Redis,
+    private queueKey: string,
+  ) {
     this.redis = redis;
     this.subscriber = redis.duplicate();
-    this.queueKey = queueKey;
 
     // Subscribe to Redis channels for job events
-    this.subscriber.subscribe("job:push", "job:complete", "job:start");
+    this.subscriber.subscribe(
+      `${queueKey}:job:push`,
+      `${queueKey}:job:complete`,
+      `${queueKey}:job:start`,
+    ).catch((error) => {
+      console.error("Error subscribing to Redis channels:", error);
+    });
 
     this.subscriber.on("messageBuffer", (channel, buffer) => {
-      const item = unpack(buffer) as T;
-      this.events.emit(channel, item);
+      try {
+        const item = unpack(buffer) as T;
+        const event = channel.toString().slice(`${queueKey}:`.length) as keyof TinyDispatcherEvents<T>;
+        this.events.emit(event, item);
+      } catch (error) {
+        console.error("Error processing Redis message:", error);
+      }
     });
   }
 
   async publish(event: string, arg: any) {
-    const serializedItem = pack(arg);
-    await this.redis.publish(event, serializedItem);
+    try {
+      const serializedItem = pack(arg);
+      await this.redis.publish(`${this.queueKey}:${event}`, serializedItem);
+    } catch (error) {
+      console.error("Error publishing event:", error);
+    }
   }
 
   async rpush(item: T): Promise<void> {
-    const serializedItem = pack(item);
-    await this.redis.rpush(this.queueKey, serializedItem);
-    await this.redis.publish("job:push", serializedItem);
+    try {
+      const serializedItem = pack(item);
+      await this.redis.rpush(this.queueKey, serializedItem);
+      await this.redis.publish(`${this.queueKey}:job:push`, serializedItem);
+    } catch (error) {
+      console.error("Error pushing item to queue:", error);
+    }
   }
 
   async lpush(item: T): Promise<void> {
-    const serializedItem = pack(item);
-    await this.redis.lpush(this.queueKey, serializedItem);
-    // console.debug("lpush");
+    try {
+      const serializedItem = pack(item);
+      await this.redis.lpush(this.queueKey, serializedItem);
+    } catch (error) {
+      console.error("Error pushing item to front of queue:", error);
+    }
   }
 
   async lpop(): Promise<T | undefined> {
-    const buffer = await this.redis.lpopBuffer(this.queueKey);
-    if (!buffer) return undefined;
-    const item = unpack(buffer);
-
-    return item;
+    try {
+      const buffer = await this.redis.lpopBuffer(this.queueKey);
+      if (!buffer) return undefined;
+      return unpack(buffer);
+    } catch (error) {
+      console.error("Error popping item from queue:", error);
+      return undefined;
+    }
   }
 
   async getPendingJobCount(): Promise<number> {
-    return await this.redis.llen(this.queueKey);
+    try {
+      return await this.redis.llen(this.queueKey);
+    } catch (error) {
+      console.error("Error getting pending job count:", error);
+      return 0;
+    }
   }
 }
