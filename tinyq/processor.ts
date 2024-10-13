@@ -1,21 +1,17 @@
-import { TinyQ, type WorkerJob } from "./tinyq";
+import { TinyQ, type WorkerJob } from "./index";
 import { EventEmitter } from "node:events";
 import assert from "node:assert";
+import { type SpawnOptions, Subprocess } from "bun";
 
-export type MasterToWorkerEvent =
-  | { type: "job:start"; job: WorkerJob<any> }
-  | { type: "close" };
+export type MasterToWorkerEvent = { type: "job:start"; job: WorkerJob<any> };
 
 export type WorkerToMasterEvent<T extends WorkerJob<any>> =
   | { type: "hello" }
-  | { type: "job:processed"; job: T }
-  | { type: "closed" };
+  | { type: "job:processed"; job: T };
 
 export interface ThreadPool<T extends WorkerJob<any>> {
   events: EventEmitter<{
     "thread:free": [JobThread<T>];
-    "thread:kill": [JobThread<T>];
-    "pool:kill": [];
     "job:complete": [job: T];
   }>;
   threads: JobThread<T>[];
@@ -25,18 +21,22 @@ class JobThread<T extends WorkerJob<any>> {
   isBusy: boolean = false;
   isOpen: boolean = false;
 
+  private subprocess: Subprocess;
+
   constructor(
-    public _worker: Worker,
+    cmd: string[],
+    spawnOptions: SpawnOptions.OptionsObject,
     private poolEvents: ThreadPool<T>["events"],
   ) {
-    this._worker.onmessage = (event) => {
-      assert(event.type, "message");
-      this.handleWorkerMessage(event.data);
-    };
+    this.subprocess = Bun.spawn(cmd, {
+      ...spawnOptions,
+      ipc: this.handleWorkerMessage.bind(this),
+      // ipc
+      stdout: "inherit",
+    });
   }
 
-  handleWorkerMessage(message: WorkerToMasterEvent<T>) {
-    // console.log("message thread", message);
+  async handleWorkerMessage(message: WorkerToMasterEvent<T>) {
     switch (message.type) {
       case "hello": {
         this.isOpen = true;
@@ -50,17 +50,11 @@ class JobThread<T extends WorkerJob<any>> {
         this.poolEvents.emit("job:complete", message.job);
         break;
       }
-      case "closed": {
-        this._worker.terminate();
-        this.isOpen = false;
-        this.poolEvents.emit("thread:kill", this);
-        break;
-      }
     }
   }
 
   sendMessage(message: MasterToWorkerEvent) {
-    this._worker.postMessage(message);
+    this.subprocess.send(message);
   }
 
   private locked = false;
@@ -86,6 +80,12 @@ class JobThread<T extends WorkerJob<any>> {
       job,
     });
   }
+
+  async kill() {
+    this.isOpen = false;
+    this.subprocess.kill();
+    return await this.subprocess.exited;
+  }
 }
 
 export function findAvailableThread(pool: ThreadPool<any>) {
@@ -109,26 +109,16 @@ export const processTinyQs = <K extends (...p: any) => any>(
     threadPool.threads = Array(concurrency)
       .fill(0)
       .map((_, index) => {
-        const worker = new Worker(workerUrl, {
-          type: "module",
-          name: `worker:${jobName}:${index}`,
-        });
-        return new JobThread(worker, threadPool.events);
+        return new JobThread(
+          ["bun", workerUrl.pathname],
+          {
+            env: { ...process.env, workerName: `worker:${jobName}:${index}` },
+          },
+          threadPool.events,
+        );
       });
 
-    // threadPool.events.on("thread:kill", (thread) => {
-    //   if (threadPool.threads.every((th) => !th.isOpen)) {
-    //     threadPool.events.emit("pool:kill");
-    //   }
-    // });
-
-    let totalNextJobsCount = 0;
     const processNextJob = async () => {
-      totalNextJobsCount += 1;
-      // console.log({ totalNextJobsCount });
-      // const hasPendingJobs = (await dispatcher.getPendingJobCount()) > 0;
-      // if (!hasPendingJobs) return;
-
       const thread = findAvailableThread(threadPool);
       if (!thread) return;
       thread.lock(); // preserve atomicity
@@ -146,9 +136,22 @@ export const processTinyQs = <K extends (...p: any) => any>(
     dispatcher.events.on("job:push", () => processNextJob());
 
     threadPool.events.on("job:complete", (job) => {
-      dispatcher.events.emit("job:complete", job);
+      dispatcher.publish("job:complete", job);
     });
+
     return threadPool;
+  });
+
+  process.on("SIGINT", async () => {
+    console.log("Received SIGINT");
+    console.log("Terminating workers");
+    const promises = pools.flatMap((pool) =>
+      pool.threads.map((thread) => thread.kill()),
+    );
+    console.log("Waiting for all workers to close.");
+    await Promise.all(promises);
+    console.log("Exiting...");
+    process.exit();
   });
 
   return pools;

@@ -1,10 +1,6 @@
-import EventEmitter from "node:events";
 import assert from "node:assert";
-import { JobStatus, type WorkerJob } from "./tinyq";
-import type {
-  MasterToWorkerEvent,
-  WorkerToMasterEvent,
-} from "./tinyq-processor.js";
+import { JobStatus, type WorkerJob } from "./index";
+import type { MasterToWorkerEvent, WorkerToMasterEvent } from "./processor.js";
 
 interface WorkerContext {
   entrypoint: (...params: any) => any;
@@ -27,9 +23,7 @@ const __worker: WorkerContext = {
 export const onDestroy = (cb: typeof __worker.onDestroy) =>
   (__worker.onDestroy = cb);
 
-// console.assert(process.send)
 function sendMessage(message: WorkerToMasterEvent<any>) {
-  // self.postMessage(message);
   process.send!(message);
 }
 
@@ -57,8 +51,6 @@ const processJob = async (job: WorkerJob<any>) => {
 const handleMessage = async (message: MasterToWorkerEvent) => {
   // console.log("got message", message);
   try {
-    // assert(event.type == "message", "expected a message");
-    // const message: MasterToWorkerEvent = event.data;
     switch (message.type) {
       case "job:start":
         assert(!__worker.isProcessing, `worker is currently working on job`);
@@ -71,10 +63,6 @@ const handleMessage = async (message: MasterToWorkerEvent) => {
     console.error("ERROR", e);
   }
 };
-
-// self.addEventListener("message", handleMessage);
-// self.onmessage = handleMessage;
-// console.log(`${Bun.env.workerName}] inited`);
 
 const consoleProxy = new Proxy(console, {
   get(target: Console, property: keyof Console) {

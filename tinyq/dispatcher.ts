@@ -1,10 +1,10 @@
 import { Redis } from "ioredis";
 import { EventEmitter } from "events";
 import { pack, unpack } from "msgpackr";
+import { WorkerJob } from "./index";
 
 interface TinyDispatcherEvents<T> {
   "job:push": [T];
-  // "job:pop": [T];
   "job:complete": [T];
   "job:start": [T];
 }
@@ -14,9 +14,12 @@ export interface TinyDispatcher<T> {
   popJob(): Promise<T | undefined>;
   getPendingJobCount(): Promise<number>;
   events: EventEmitter<TinyDispatcherEvents<T>>;
+  publish(event: string, arg: any): Promise<void>;
 }
 
-export class RedisTinyDispatcher<T> implements TinyDispatcher<T> {
+export class RedisTinyDispatcher<T extends WorkerJob<any>>
+  implements TinyDispatcher<T>
+{
   private redis: Redis;
   private subscriber: Redis;
   public events = new EventEmitter<TinyDispatcherEvents<T>>();
@@ -29,18 +32,17 @@ export class RedisTinyDispatcher<T> implements TinyDispatcher<T> {
     this.queueKey = queueKey;
 
     // Subscribe to Redis channels for job events
-    this.subscriber.subscribe(
-      "job:push",
-      // "job:pop",
-      "job:complete",
-      "job:start",
-    );
+    this.subscriber.subscribe("job:push", "job:complete", "job:start");
 
-    // Handle incoming messages and re-emit them via EventEmitter
     this.subscriber.on("messageBuffer", (channel, buffer) => {
       const item = unpack(buffer) as T;
       this.events.emit(channel, item);
     });
+  }
+
+  async publish(event: string, arg: any) {
+    const serializedItem = pack(arg);
+    await this.redis.publish(event, serializedItem);
   }
 
   async pushJob(item: T): Promise<void> {

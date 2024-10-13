@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { RedisTinyDispatcher, TinyDispatcher } from "./tinyq-dispatcher";
+import { RedisTinyDispatcher, TinyDispatcher } from "./dispatcher";
 import Redis from "ioredis";
 
 export enum JobStatus {
@@ -22,7 +22,7 @@ export interface WorkerJob<JobSignature extends (...params: any) => any> {
 export class TinyQ<
   JobSignature extends (...params: any) => any = (...params: unknown[]) => any,
 > {
-  private dispatcher: TinyDispatcher<WorkerJob<JobSignature>>;
+  public dispatcher: TinyDispatcher<WorkerJob<JobSignature>>;
 
   constructor(
     private jobName: string,
@@ -49,7 +49,7 @@ export class TinyQ<
     return this;
   }
 
-  async enqueueJob(...params: Parameters<JobSignature>) {
+  async enqueueJob(params: Parameters<JobSignature>) {
     const job: WorkerJob<JobSignature> = {
       id: randomUUID(),
       status: JobStatus.PENDING,
@@ -57,6 +57,7 @@ export class TinyQ<
       metadata: {},
       executionTime: -1,
     };
+
     await this.dispatcher
       .pushJob(job)
       .catch((e) => console.error("error pushing job!", e));
