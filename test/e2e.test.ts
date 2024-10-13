@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq/index";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("End-to-End TinyQ Testing", () => {
   let redis: Redis;
@@ -15,7 +16,7 @@ describe("End-to-End TinyQ Testing", () => {
     // Create a TinyQ instance
     q = new TinyQ("test-queue", redis)
       .useWorkerFile("./test-worker.ts", import.meta)
-      .setConcurrency(2);
+      .setConcurrency(Fuzz.number(1, 30));
 
     // Start processing
     pools = processTinyQs(q);
@@ -34,7 +35,7 @@ describe("End-to-End TinyQ Testing", () => {
 
   it("should process jobs correctly", async () => {
     // Enqueue jobs
-    const jobCount = 1_000;
+    const jobCount = Fuzz.number(100, 2000);
     const startTime = Date.now();
     for (let i = 0; i < jobCount; i++) {
       q.enqueueJob([i]);

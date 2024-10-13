@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("TinyQ Error Handling", () => {
   let redis: Redis;
@@ -15,7 +16,7 @@ describe("TinyQ Error Handling", () => {
     // Create a TinyQ instance
     q = new TinyQ("error-queue", redis)
       .useWorkerFile("./error-worker.ts", import.meta)
-      .setConcurrency(10);
+      .setConcurrency(Fuzz.number(1, 30));
 
     // Start processing
     pools = processTinyQs(q);
@@ -34,13 +35,9 @@ describe("TinyQ Error Handling", () => {
 
   it("should handle job errors correctly", async () => {
     // Enqueue jobs, some of which will cause errors
-    const jobCount = 10;
+    const jobCount = Fuzz.number(10, 400);
     const errorInputs = [3, 7]; // Inputs that will cause errors
     const startTime = Date.now();
-
-    for (let i = 0; i < jobCount; i++) {
-      await q.enqueueJob([i]);
-    }
 
     // Set up listener for job completion
     const completedJobs: WorkerJob<(x: number) => number>[] = [];
@@ -48,9 +45,20 @@ describe("TinyQ Error Handling", () => {
       completedJobs.push(job);
     });
 
+
+    console.time("enqueue");
+    for (let i = 0; i < jobCount; i++) {
+      await q.enqueueJob([i]);
+    }
+    console.timeEnd("enqueue");
+
     // Wait for jobs to complete
     await new Promise<void>((resolve) => {
       const check = () => {
+        console.log(
+          `completedJobs.length: ${completedJobs.length}`,
+          `jobCount: ${jobCount}`,
+        );
         if (completedJobs.length >= jobCount) {
           resolve();
         } else {

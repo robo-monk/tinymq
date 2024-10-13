@@ -2,11 +2,14 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
+import type { FnType1 } from "./worker-one";
+import type { FnType2 } from "./worker-two";
 
 describe("TinyQ Multiple Queues Processing", () => {
   let redis: Redis;
-  let q1: TinyQ<(x: number) => number>;
-  let q2: TinyQ<(x: number) => string>;
+  let q1: TinyQ<FnType1>;
+  let q2: TinyQ<FnType2>;
   let pools: ReturnType<typeof processTinyQs>;
 
   beforeAll(async () => {
@@ -16,7 +19,7 @@ describe("TinyQ Multiple Queues Processing", () => {
     // Create TinyQ instances
     q1 = new TinyQ("queue-one", redis)
       .useWorkerFile("./worker-one.ts", import.meta)
-      .setConcurrency(2);
+      .setConcurrency(Fuzz.number(1, 30));
 
     q2 = new TinyQ("queue-two", redis)
       .useWorkerFile("./worker-two.ts", import.meta)
@@ -39,12 +42,7 @@ describe("TinyQ Multiple Queues Processing", () => {
 
   it("should process multiple queues correctly", async () => {
     // Enqueue jobs to both queues
-    const jobCount = 10;
-
-    for (let i = 0; i < jobCount; i++) {
-      await q1.enqueueJob([i]);
-      await q2.enqueueJob([i]);
-    }
+    const jobCount = Fuzz.number(100, 2000);
 
     // Set up listeners for job completions
     const completedJobsQ1: WorkerJob<(x: number) => number>[] = [];
@@ -57,6 +55,12 @@ describe("TinyQ Multiple Queues Processing", () => {
     q2.dispatcher.events.on("job:complete", (job) => {
       completedJobsQ2.push(job);
     });
+
+
+    for (let i = 0; i < jobCount; i++) {
+      await q1.enqueueJob([i]);
+      await q2.enqueueJob([i]);
+    }
 
     // Wait for all jobs to complete
     await new Promise<void>((resolve) => {

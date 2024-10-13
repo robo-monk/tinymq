@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("TinyQ Job Cancellation", () => {
   let redis: Redis;
@@ -34,19 +35,21 @@ describe("TinyQ Job Cancellation", () => {
 
   it("should cancel jobs correctly", async () => {
     // Enqueue jobs
-    const jobCount = 5;
-    for (let i = 0; i < jobCount; i++) {
-      await q.enqueueJob([i]);
-    }
-
-    // Cancel jobs before they are processed
-    const canceledJob = await q.dispatcher.lpop(); // Remove the next job from the queue
+    const jobCount = Fuzz.number(10, 500);
 
     // Set up listener for job completion
     const completedJobs: WorkerJob<(x: number) => number>[] = [];
     q.dispatcher.events.on("job:complete", (job) => {
       completedJobs.push(job);
     });
+
+
+    for (let i = 0; i < jobCount; i++) {
+      await q.enqueueJob([i]);
+    }
+
+    // Cancel jobs before they are processed
+    const canceledJob = await q.dispatcher.lpop(); // Remove the next job from the queue
 
     // Wait for remaining jobs to complete
     await new Promise<void>((resolve) => {

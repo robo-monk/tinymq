@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("TinyQ Asynchronous Job Processing", () => {
   let redis: Redis;
@@ -15,7 +16,7 @@ describe("TinyQ Asynchronous Job Processing", () => {
     // Create a TinyQ instance
     q = new TinyQ("async-queue", redis)
       .useWorkerFile("./async-worker.ts", import.meta)
-      .setConcurrency(2);
+      .setConcurrency(Fuzz.number(1, 10));
 
     // Start processing
     pools = processTinyQs(q);
@@ -34,17 +35,17 @@ describe("TinyQ Asynchronous Job Processing", () => {
 
   it("should process asynchronous jobs correctly", async () => {
     // Enqueue jobs
-    const jobCount = 20;
-
-    for (let i = 0; i < jobCount; i++) {
-      await q.enqueueJob([i]);
-    }
+    const jobCount = Fuzz.number(4, 500);
 
     // Set up listener for job completion
     const completedJobs: WorkerJob<(x: number) => Promise<number>>[] = [];
     q.dispatcher.events.on("job:complete", (job) => {
       completedJobs.push(job);
     });
+
+    for (let i = 0; i < jobCount; i++) {
+      q.enqueueJob([i]);
+    }
 
     // Wait for jobs to complete
     await new Promise<void>((resolve) => {
@@ -64,5 +65,7 @@ describe("TinyQ Asynchronous Job Processing", () => {
       expect(job.status).toBe(JobStatus.COMPLETED);
       expect(job.output).toBe(job.input[0] * 2);
     }
+  }, {
+    timeout: 10000,
   });
 });

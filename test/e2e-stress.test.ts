@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("TinyQ Concurrency and Stress Testing", () => {
   let redis: Redis;
@@ -15,7 +16,7 @@ describe("TinyQ Concurrency and Stress Testing", () => {
     // Create a TinyQ instance
     q = new TinyQ("stress-queue", redis)
       .useWorkerFile("./test-worker.ts", import.meta)
-      .setConcurrency(10); // High concurrency
+      .setConcurrency(Fuzz.number(10, 50)); // High concurrency
 
     // Start processing
     pools = processTinyQs(q);
@@ -36,7 +37,7 @@ describe("TinyQ Concurrency and Stress Testing", () => {
     "should handle high load correctly",
     async () => {
       // Enqueue a large number of jobs
-      const jobCount = 10_000;
+      const jobCount = Fuzz.number(1_000, 20_000);
       const startTime = Date.now();
 
       // Set up listener for job completion
@@ -69,6 +70,6 @@ describe("TinyQ Concurrency and Stress Testing", () => {
       console.log(`Processed ${jobCount} jobs in ${totalTime} ms`);
       console.log(`Throughput: ${(jobCount / totalTime) * 1000} jobs/sec`);
     },
-    { timeout: 10_000 },
+    { timeout: 20_000 },
   );
 });

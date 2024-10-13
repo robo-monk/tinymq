@@ -13,7 +13,7 @@ export interface WorkerJob<JobSignature extends (...params: any) => any> {
   id: string;
   status: JobStatus;
   input: Parameters<JobSignature>;
-  output?: ReturnType<JobSignature>;
+  output?: Awaited<ReturnType<JobSignature>>;
   errors?: string[];
   metadata: Record<string, string>;
   executionTime: number;

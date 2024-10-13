@@ -32,7 +32,7 @@ class JobThread<T extends WorkerJob<any>> {
       ...spawnOptions,
       ipc: this.handleWorkerMessage.bind(this),
       // ipc
-      stdout: "inherit",
+      // stdout: "inherit",
     });
     // this.subprocess.killed
   }
@@ -99,8 +99,8 @@ export function findAvailableThread(pool: ThreadPool<any>) {
   return pool.threads.find((t) => !t.isBusy && t.isOpen && !t.isLocked);
 }
 
-export const processTinyQs = <K extends (...p: any) => any>(
-  ...qs: TinyQ<K>[]
+export const processTinyQs = <K extends (...params: any) => any>(
+  ...qs: TinyQ<any>[]
 ) => {
   const pools = qs.map((q) => {
     const { jobName, concurrency, dispatcher, workerUrl } =

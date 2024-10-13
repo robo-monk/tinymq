@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import Redis from "ioredis";
 import { TinyQ, WorkerJob, JobStatus } from "../tinyq";
 import { processTinyQs } from "../tinyq/processor";
+import { Fuzz } from "./fuzzer";
 
 describe("TinyQ Persistence and Recovery", () => {
   let redis: Redis;
@@ -36,7 +37,7 @@ describe("TinyQ Persistence and Recovery", () => {
     "should recover from worker failure",
     async () => {
       // Enqueue jobs
-      const jobCount = 1_000;
+      const jobCount = Fuzz.number(10, 1000);
 
       // Set up listener for job completion
       const completedJobs: WorkerJob<(x: number) => number>[] = [];
@@ -65,9 +66,6 @@ describe("TinyQ Persistence and Recovery", () => {
       });
 
       // Verify that all jobs are completed despite the worker failure
-      completedJobs.map((job) => {
-        console.log(job);
-      });
       expect(completedJobs.length).toBe(jobCount);
       for (const job of completedJobs) {
         expect(job.status).toBe(JobStatus.COMPLETED);

@@ -1,5 +1,8 @@
 import { registerEntrypoint } from "../tinyq/worker";
 
-registerEntrypoint((x: number) => {
+export type FnType2 = typeof fn;
+function fn(x: number) {
   return `Number: ${x}`;
-});
+}
+
+registerEntrypoint(fn);
