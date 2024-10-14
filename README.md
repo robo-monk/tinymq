@@ -1,8 +1,9 @@
 # TinyMQ
 Lightweight job queue solution trying to keep things simple and fast.
 
+## Documentation
 
-1. Set Up a Shared Job Queue
+### 1. Set Up a Shared Job Queue
 ```ts
 // shared-queues.ts
 import { TinyMQ } from "tinymq"
@@ -15,7 +16,7 @@ export const primeQueue = new TinyQ("prime", redis)
   .useWorkerFile<PrimeJob>("./prime.job.ts", import.meta)
 ```
 
-2. Define the Job
+### 2. Define the Job
 ```ts
 // prime.job.ts
 import { registerEntrypoint } from "tinymq/worker"
@@ -43,7 +44,7 @@ function runPrime(limit: number): number[] {
 registerEntrypoint(runPrime)
 ```
 
-3. Processor process
+### 3. Processor process
 This is the `master` process, from which all the workers are going to get spawned.
 You should have only 1 master process. Clusters are not supported.
 ```ts
@@ -68,7 +69,7 @@ const p = MQProcessor
 ```
 
 
-4. Add jobs to the queue
+### 4. Add jobs to the queue
 ```ts
 // anywhere from your code to register a task
 import { JobStatus } from "tinymq"
