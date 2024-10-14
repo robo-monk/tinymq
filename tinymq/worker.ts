@@ -47,9 +47,7 @@ const processJob = async (job: WorkerJob<any>) => {
   }
 };
 
-// const handleMessage = async (event: MessageEvent) => {
 const handleMessage = async (message: MasterToWorkerEvent) => {
-  // console.log("got message", message);
   try {
     switch (message.type) {
       case "job:start":

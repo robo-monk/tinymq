@@ -33,18 +33,22 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
     this.subscriber = redis.duplicate();
 
     // Subscribe to Redis channels for job events
-    this.subscriber.subscribe(
-      `${queueKey}:job:push`,
-      `${queueKey}:job:complete`,
-      `${queueKey}:job:start`,
-    ).catch((error) => {
-      console.error("Error subscribing to Redis channels:", error);
-    });
+    this.subscriber
+      .subscribe(
+        `${queueKey}:job:push`,
+        `${queueKey}:job:complete`,
+        `${queueKey}:job:start`,
+      )
+      .catch((error) => {
+        console.error("Error subscribing to Redis channels:", error);
+      });
 
     this.subscriber.on("messageBuffer", (channel, buffer) => {
       try {
         const item = unpack(buffer) as T;
-        const event = channel.toString().slice(`${queueKey}:`.length) as keyof TinyDispatcherEvents<T>;
+        const event = channel
+          .toString()
+          .slice(`${queueKey}:`.length) as keyof TinyDispatcherEvents<T>;
         this.events.emit(event, item);
       } catch (error) {
         console.error("Error processing Redis message:", error);
@@ -64,8 +68,10 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
   async rpush(item: T): Promise<void> {
     try {
       const serializedItem = pack(item);
-      await this.redis.rpush(this.queueKey, serializedItem);
-      await this.redis.publish(`${this.queueKey}:job:push`, serializedItem);
+      await Promise.all([
+        this.redis.rpush(this.queueKey, serializedItem),
+        this.redis.publish(`${this.queueKey}:job:push`, serializedItem),
+      ]);
     } catch (error) {
       console.error("Error pushing item to queue:", error);
     }

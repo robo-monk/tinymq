@@ -19,7 +19,7 @@ export interface WorkerJob<JobSignature extends (...params: any) => any> {
   executionTime: number;
 }
 
-export class TinyQ<
+export class TinyMQ<
   JobSignature extends (...params: any) => any = (...params: unknown[]) => any,
 > {
   public dispatcher: TinyDispatcher<WorkerJob<JobSignature>>;
@@ -38,15 +38,9 @@ export class TinyQ<
   useWorkerFile<TaskSignature extends (...params: any) => any>(
     filename: string,
     importMeta: ImportMeta,
-  ): TinyQ<TaskSignature> {
+  ): TinyMQ<TaskSignature> {
     this.workerUrl = new URL(filename, importMeta.url);
-    return this as unknown as TinyQ<TaskSignature>;
-  }
-
-  protected concurrency: number = 1;
-  setConcurrency(workerCount: number) {
-    this.concurrency = workerCount;
-    return this;
+    return this as unknown as TinyMQ<TaskSignature>;
   }
 
   async enqueueJob(params: Parameters<JobSignature>) {
@@ -65,10 +59,9 @@ export class TinyQ<
     }
   }
 
-  static _getSettings(q: TinyQ) {
+  static _getSettings(q: TinyMQ) {
     return {
       jobName: q.jobName,
-      concurrency: q.concurrency,
       dispatcher: q.dispatcher,
       workerUrl: q.workerUrl,
     };
