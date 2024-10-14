@@ -32,7 +32,7 @@ const processJob = async (job: WorkerJob<any>) => {
     const start = performance.now();
     try {
       job.output = await __worker.entrypoint(...job.input); // Run the entrypoint function
-      job.status = JobStatus.COMPLETED;
+      job.status = JobStatus.SUCCESS;
     } catch (e: any) {
       console.error(`Job ${job.id} errored`, e);
       job.errors = [e];

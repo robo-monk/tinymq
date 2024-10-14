@@ -5,7 +5,7 @@ import Redis from "ioredis";
 export enum JobStatus {
   PENDING,
   RUNNING,
-  COMPLETED,
+  SUCCESS,
   FAILED,
 }
 
@@ -43,7 +43,7 @@ export class TinyMQ<
     return this as unknown as TinyMQ<TaskSignature>;
   }
 
-  async enqueueJob(params: Parameters<JobSignature>) {
+  async add(params: Parameters<JobSignature>) {
     const job: WorkerJob<JobSignature> = {
       id: randomUUID(),
       status: JobStatus.PENDING,
