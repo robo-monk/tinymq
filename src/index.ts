@@ -43,7 +43,7 @@ export class TinyMQ<
     return this as unknown as TinyMQ<TaskSignature>;
   }
 
-  async add(params: Parameters<JobSignature>) {
+  async add(...params: Parameters<JobSignature>) {
     const job: WorkerJob<JobSignature> = {
       id: randomUUID(),
       status: JobStatus.PENDING,

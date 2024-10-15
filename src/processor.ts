@@ -32,6 +32,7 @@ class JobThread<T extends WorkerJob<any>> {
     this.subprocess = Bun.spawn(cmd, {
       ...spawnOptions,
       ipc: this.handleWorkerMessage.bind(this),
+      // stdout: "inherit",
     });
   }
 

@@ -12,8 +12,9 @@ import type { PrimeJob } from "./prime.job.ts"
 
 const redis = new Redis();
 
-export const primeQueue = new TinyQ("prime", redis)
+export const primeQueue = new TinyMQ("prime", redis)
   .useWorkerFile<PrimeJob>("./prime.job.ts", import.meta)
+
 ```
 
 ### 2. Define the Job
@@ -86,4 +87,13 @@ primeQueue.dispatcher.events.on("job:complete", job => {
       console.log('job failed', job)
   }
 })
+```
+
+
+## Running tests
+```
+redis-server
+```
+```
+but test --coverage --rerun-each 10
 ```

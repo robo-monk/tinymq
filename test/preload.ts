@@ -19,6 +19,7 @@ export async function spawnProcessor(importMeta: ImportMeta) {
     sub.kill();
     const code = await sub.exited;
     sub = null;
+    await new Promise((r) => setTimeout(r, 50));
     return code;
   };
 }

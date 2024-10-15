@@ -51,7 +51,8 @@ export class RedisTinyDispatcher<T extends WorkerJob<any>>
           .slice(`${queueKey}:`.length) as keyof TinyDispatcherEvents<T>;
         this.events.emit(event, item);
       } catch (error) {
-        console.error("Error processing Redis message:", error);
+        console.error("Error processing Redis message");
+        console.error(error);
       }
     });
   }

@@ -17,7 +17,7 @@ describe("default test", () => {
   it("works", async () => {
     const kill = await spawnProcessor(import.meta);
     const inputs = ["one", "two", "three"];
-    testTq.add(inputs);
+    testTq.add(...inputs);
 
     const nice = await new Promise<boolean>((resolve) =>
       testTq.dispatcher.events.once("job:complete", (job) => {
@@ -26,15 +26,11 @@ describe("default test", () => {
       }),
     );
 
-    expect(nice);
-    expect((await kill()) == 0);
+    expect(nice).toBeTrue();
+    expect(await kill()).toBe(0);
   });
 });
 
-// afterAll(async () => {
-//   await killProcessor(import.meta);
-//   console.log("killed!");
-// });
 describe("multiple jobs", () => {
   it("handles multiple jobs", async () => {
     const kill = await spawnProcessor(import.meta);
@@ -42,7 +38,7 @@ describe("multiple jobs", () => {
     const jobCount = 1_000;
 
     for (let i = 0; i < jobCount; i++) {
-      testTq.add(inputs);
+      testTq.add(...inputs);
     }
 
     let jobComplete = 0;
@@ -58,10 +54,9 @@ describe("multiple jobs", () => {
       testTq.dispatcher.events.on("job:complete", (j) => fn(j, resolve));
     });
 
-    console.log;
     testTq.dispatcher.events.off("job:complete", fn);
 
-    expect(nice);
-    expect((await kill()) == 0);
+    expect(nice).toBeTrue();
+    expect(await kill()).toBe(0);
   });
 });
