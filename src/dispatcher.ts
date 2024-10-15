@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import { pack, unpack } from "msgpackr";
 import { WorkerJob } from "./index";
 
-interface TinyDispatcherEvents<T> {
+export interface TinyDispatcherEvents<T> {
   "job:push": [T];
   "job:complete": [T];
   "job:start": [T];

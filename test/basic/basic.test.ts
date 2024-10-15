@@ -11,22 +11,19 @@ import {
 
 import { testTq } from "./queue";
 import { spawnProcessor } from "../preload";
-import { WorkerJob } from "../../src";
+import { JobStatus, WorkerJob } from "../../src";
 
 describe("default test", () => {
   it("works", async () => {
     const kill = await spawnProcessor(import.meta);
     const inputs = ["one", "two", "three"];
-    testTq.add(...inputs);
-
-    const nice = await new Promise<boolean>((resolve) =>
-      testTq.dispatcher.events.once("job:complete", (job) => {
-        // console.log({ job });
-        resolve(job.output == inputs.join("-"));
-      }),
-    );
-
-    expect(nice).toBeTrue();
+    const { job, result } = testTq.add(...inputs);
+    expect(job.id).toBeString();
+    expect(job.input).toEqual(inputs);
+    expect(job.status).toBe(JobStatus.PENDING);
+    const output = await result;
+    expect(job.status).toBe(JobStatus.SUCCESS);
+    expect(output).toBe(inputs.join("-"));
     expect(await kill()).toBe(0);
   });
 });
@@ -57,6 +54,27 @@ describe("multiple jobs", () => {
     testTq.dispatcher.events.off("job:complete", fn);
 
     expect(nice).toBeTrue();
+    expect(await kill()).toBe(0);
+  });
+});
+
+describe("multiple jobs fancy api", () => {
+  it("handles multiple jobs", async () => {
+    const kill = await spawnProcessor(import.meta);
+    const inputs = ["one", "two", "three"];
+    const jobCount = 1_000;
+
+    const promises = Array(jobCount)
+      .fill(0)
+      .map(() => testTq.add(...inputs));
+
+    const i = await Promise.all(promises.map((p) => p.result));
+    console.log(i);
+    promises.forEach(({ job }) => {
+      expect(job.status).toBe(JobStatus.SUCCESS);
+      expect(job.output).toBe(job.input.join("-"));
+    });
+
     expect(await kill()).toBe(0);
   });
 });

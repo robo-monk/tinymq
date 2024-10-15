@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { RedisTinyDispatcher, TinyDispatcher } from "./dispatcher";
+import {
+  RedisTinyDispatcher,
+  TinyDispatcher,
+  TinyDispatcherEvents,
+} from "./dispatcher";
 import Redis from "ioredis";
 
 export enum JobStatus {
@@ -43,8 +47,8 @@ export class TinyMQ<
     return this as unknown as TinyMQ<TaskSignature>;
   }
 
-  async add(...params: Parameters<JobSignature>) {
-    const job: WorkerJob<JobSignature> = {
+  add(...params: Parameters<JobSignature>) {
+    const newJob: WorkerJob<JobSignature> = {
       id: randomUUID(),
       status: JobStatus.PENDING,
       input: params,
@@ -52,11 +56,44 @@ export class TinyMQ<
       executionTime: -1,
     };
 
+    let promise: Promise<void>;
     try {
-      await this.dispatcher.rpush(job);
+      promise = this.dispatcher.rpush(newJob);
     } catch (e) {
       console.error("eerror foudn here", e);
     }
+
+    const ret = {
+      job: newJob,
+      get result() {
+        return new Promise<typeof newJob.output>((resolve) => {
+          ret.once("complete", (job) => {
+            Object.assign(newJob, job);
+            resolve(job.output);
+          });
+        });
+      },
+      once: (
+        event: "complete" | "started",
+        callback: (job: WorkerJob<JobSignature>) => any,
+      ) => {
+        const eventKey = `job:${event}` as keyof TinyDispatcherEvents<
+          WorkerJob<JobSignature>
+        >;
+
+        const fn = (job: WorkerJob<JobSignature>) => {
+          if (job.id == newJob.id) {
+            this.dispatcher.events.off(eventKey, fn);
+            callback(job);
+          }
+        };
+
+        this.dispatcher.events.on(eventKey, fn);
+        return ret;
+      },
+    };
+
+    return ret;
   }
 
   static _getSettings(q: TinyMQ) {
