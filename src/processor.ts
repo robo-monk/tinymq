@@ -2,7 +2,7 @@ import { TinyMQ, type WorkerJob } from "./index";
 import { EventEmitter } from "node:events";
 import assert from "node:assert";
 import { type SpawnOptions, Subprocess } from "bun";
-import { TinyDispatcher } from "../merged-output";
+import { TinyDispatcher } from "./dispatcher";
 
 export type MasterToWorkerEvent = { type: "job:start"; job: WorkerJob<any> };
 

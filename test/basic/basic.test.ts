@@ -11,13 +11,13 @@ import {
 
 import { testTq } from "./queue";
 import { spawnProcessor } from "../preload";
-import { WorkerJob } from "../../tinyq";
+import { WorkerJob } from "../../src";
 
 describe("default test", () => {
   it("works", async () => {
     const kill = await spawnProcessor(import.meta);
     const inputs = ["one", "two", "three"];
-    testTq.enqueueJob(inputs);
+    testTq.add(inputs);
 
     const nice = await new Promise<boolean>((resolve) =>
       testTq.dispatcher.events.once("job:complete", (job) => {
@@ -42,7 +42,7 @@ describe("multiple jobs", () => {
     const jobCount = 1_000;
 
     for (let i = 0; i < jobCount; i++) {
-      testTq.enqueueJob(inputs);
+      testTq.add(inputs);
     }
 
     let jobComplete = 0;

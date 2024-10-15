@@ -1,4 +1,4 @@
-import { onDestroy, registerEntrypoint } from "../../tinyq/worker";
+import { onDestroy, registerEntrypoint } from "../../src/worker";
 export type TestTask = typeof testTask;
 
 export async function testTask(...inputs: string[]) {

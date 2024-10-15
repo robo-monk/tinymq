@@ -1,6 +1,6 @@
 import { testTq } from "./queue";
-import { TinyQProcessor } from "../../tinyq/processor";
+import { MQProcessor } from "../../src/processor";
 
-TinyQProcessor.addQueue(testTq, {
+MQProcessor.addQueue(testTq, {
   concurrency: 4,
 }).start();
